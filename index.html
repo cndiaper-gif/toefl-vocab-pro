@@ -220,21 +220,7 @@
       {word:'abandon',meaning:'放弃；抛弃',phonetic:'/əˈbændən/'},{word:'adapt',meaning:'适应；改编',phonetic:'/əˈdæpt/'},{word:'advocate',meaning:'提倡；拥护',phonetic:'/ˈædvəkeɪt/'},{word:'allocate',meaning:'分配',phonetic:'/ˈæləkeɪt/'},{word:'assess',meaning:'评估',phonetic:'/əˈses/'},{word:'coherent',meaning:'连贯的',phonetic:'/koʊˈhɪrənt/'},{word:'derive',meaning:'源自；获得',phonetic:'/dɪˈraɪv/'},{word:'enhance',meaning:'增强；提高',phonetic:'/ɪnˈhæns/'},{word:'significant',meaning:'重要的；显著的',phonetic:'/sɪɡˈnɪfɪkənt/'},{word:'implement',meaning:'实施',phonetic:'/ˈɪmplɪment/'},{word:'maintain',meaning:'维持；主张',phonetic:'/meɪnˈteɪn/'},{word:'obtain',meaning:'获得',phonetic:'/əbˈteɪn/'},
       {word:'accurate',meaning:'准确的',phonetic:'/ˈækjərət/'},{word:'approach',meaning:'方法；接近',phonetic:'/əˈproʊtʃ/'},{word:'benefit',meaning:'益处；受益',phonetic:'/ˈbenɪfɪt/'},{word:'capture',meaning:'捕获；吸引',phonetic:'/ˈkæptʃər/'},{word:'confirm',meaning:'确认',phonetic:'/kənˈfɜːrm/'},{word:'decline',meaning:'下降；拒绝',phonetic:'/dɪˈklaɪn/'},{word:'distribute',meaning:'分发；分布',phonetic:'/dɪˈstrɪbjuːt/'},{word:'evaluate',meaning:'评估；评价',phonetic:'/ɪˈvæljueɪt/'}
     ];
-
-    const state={
-      user:'',
-      words:[],
-      progressMap:{},
-      knownWords:[],
-      mistakeWords:[],
-      deck:[],
-      index:0,
-      showMeaning:false,
-      query:'',
-      settings:{autoSpeak:false},
-      stats:{studyDays:[],quizScore:0},
-      quiz:{deck:[],index:0,score:0,locked:false}
-    };
+    const state={user:'',words:[],progressMap:{},knownWords:[],mistakeWords:[],deck:[],index:0,showMeaning:false,query:'',settings:{autoSpeak:false},stats:{studyDays:[],quizScore:0},quiz:{deck:[],index:0,score:0,locked:false}};
 
     function saveJson(key,val){localStorage.setItem(key,JSON.stringify(val));}
     function loadJson(key,fallback){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch{return fallback}}
@@ -244,38 +230,14 @@
     function today(){return formatDate(new Date())}
     function normalizeText(text){return text.trim().toLowerCase().replace(/\s+/g,' ')}
     function speakWord(word){if(!('speechSynthesis' in window))return;const u=new SpeechSynthesisUtterance(word);u.lang='en-US';window.speechSynthesis.cancel();window.speechSynthesis.speak(u)}
-
-    function currentWord(){return state.deck[state.index]||null}
+    function currentWord(){return state.deck[state.index]||state.deck[0]}
     function filteredWords(){return state.words.filter(w=>`${w.word} ${w.meaning} ${w.phonetic||''}`.toLowerCase().includes(state.query.toLowerCase()))}
     function dueWords(){return state.words.filter(w=>{const p=state.progressMap[w.word];if(!p)return true;return p.nextReview<=today()})}
-    function persist(){
-      saveJson(STORAGE_KEYS.words,state.words);
-      saveJson(STORAGE_KEYS.progress,state.progressMap);
-      saveJson(STORAGE_KEYS.known,state.knownWords);
-      saveJson(STORAGE_KEYS.mistakes,state.mistakeWords);
-      saveJson(STORAGE_KEYS.settings,state.settings);
-      saveJson(STORAGE_KEYS.stats,state.stats);
-    }
+    function persist(){saveJson(STORAGE_KEYS.words,state.words);saveJson(STORAGE_KEYS.progress,state.progressMap);saveJson(STORAGE_KEYS.known,state.knownWords);saveJson(STORAGE_KEYS.mistakes,state.mistakeWords);saveJson(STORAGE_KEYS.settings,state.settings);saveJson(STORAGE_KEYS.stats,state.stats)}
     function registerStudyDay(){if(!state.stats.studyDays.includes(today())) state.stats.studyDays.push(today())}
-    function buildQuiz(){
-      state.quiz.deck=shuffle(state.words).slice(0,8);
-      state.quiz.index=0;
-      state.quiz.score=0;
-      state.quiz.locked=false;
-    }
+    function buildQuiz(){state.quiz.deck=shuffle(state.words).slice(0,8);state.quiz.index=0;state.quiz.score=0;state.quiz.locked=false}
     function getQuizCurrent(){return state.quiz.deck[state.quiz.index]}
-    function getQuizOptions(){
-      const current=getQuizCurrent();
-      if(!current)return [];
-      const distractors=shuffle(state.words.filter(w=>w.word!==current.word)).slice(0,3);
-      return shuffle([current,...distractors]);
-    }
-
-    function refreshDeck(){
-      const unmastered=state.words.filter(w=>!state.knownWords.includes(w.word));
-      state.deck=shuffle(unmastered);
-      state.index=0;
-    }
+    function getQuizOptions(){const current=getQuizCurrent();if(!current)return [];const distractors=shuffle(state.words.filter(w=>w.word!==current.word)).slice(0,3);return shuffle([current,...distractors])}
 
     function renderHeader(){
       document.getElementById('userBadge').textContent=`当前用户：${state.user}`;
@@ -284,223 +246,133 @@
       document.getElementById('progressText').textContent=`${state.knownWords.length}/${state.words.length}`;
       const progress=state.words.length?Math.round((state.knownWords.length/state.words.length)*100):0;
       document.getElementById('progressFill').style.width=`${progress}%`;
-
-      const list=document.getElementById('reviewSuggestions');
-      list.innerHTML='';
-      REVIEW_STEPS.forEach(step=>{
-        const item=document.createElement('div');
-        item.className='review-item';
-        item.textContent=`Day ${step}: ${formatDate(addDays(new Date(),step))}`;
-        list.appendChild(item);
-      });
+      const list=document.getElementById('reviewSuggestions'); list.innerHTML='';
+      REVIEW_STEPS.forEach(step=>{const item=document.createElement('div');item.className='review-item';item.textContent=`Day ${step}: ${formatDate(addDays(new Date(),step))}`;list.appendChild(item)});
     }
 
     function renderFlash(){
       const current=currentWord();
-      document.getElementById('flashCounter').textContent=state.deck.length?`${state.index+1} / ${state.deck.length}`:'0 / 0';
-      document.getElementById('autoSpeakBtn').textContent=`自动发音：${state.settings.autoSpeak?'开':'关'}`;
-
-      if(!current){
-        document.getElementById('flashWord').textContent='太棒了！';
-        document.getElementById('flashPhonetic').textContent='当前列表里的单词你都标记为“我会了”了';
-        document.getElementById('flashMeaning').textContent='你可以去“导入”增加新词，或者点击“恢复默认并清空进度”重新开始。';
-        document.getElementById('dictationMeaning').textContent='当前没有未掌握单词';
-        return;
-      }
-
-      document.getElementById('flashWord').textContent=current.word;
-      document.getElementById('flashPhonetic').textContent=current.phonetic||'';
-      document.getElementById('flashMeaning').textContent=state.showMeaning?(current.meaning||''):'点击“显示释义”查看中文';
+      document.getElementById('flashCounter').textContent=`${state.index+1} / ${state.deck.length}`;
+      document.getElementById('flashWord').textContent=current?.word||'';
+      document.getElementById('flashPhonetic').textContent=current?.phonetic||'';
+      document.getElementById('flashMeaning').textContent=state.showMeaning?(current?.meaning||''):'点击“显示释义”查看中文';
       document.getElementById('toggleMeaningBtn').textContent=state.showMeaning?'隐藏释义':'显示释义';
-      document.getElementById('dictationMeaning').textContent=current.meaning||'';
-
-      if(state.settings.autoSpeak) speakWord(current.word);
+      document.getElementById('dictationMeaning').textContent=current?.meaning||'';
+      document.getElementById('autoSpeakBtn').textContent=`自动发音：${state.settings.autoSpeak?'开':'关'}`;
+      if(state.settings.autoSpeak && current) speakWord(current.word);
     }
 
     function renderDictionary(){
-      const grid=document.getElementById('dictionaryGrid');
-      grid.innerHTML='';
-
-      filteredWords().forEach(w=>{
-        const mastered=state.knownWords.includes(w.word);
-        const card=document.createElement('div');
-        card.className='word-card';
-        card.innerHTML=`
-          <div class="row space-between">
-            <div>
-              <div class="word-card-word">${w.word} ${mastered?'<span class="pill">已会</span>':''}</div>
-              <div class="word-card-phonetic">${w.phonetic||''}</div>
-            </div>
-            <button class="btn ghost" style="padding:8px 10px;border-radius:12px;">🔊</button>
-          </div>
-          <div class="word-card-meaning">${w.meaning}</div>
-        `;
-        card.querySelector('button').addEventListener('click',()=>speakWord(w.word));
-        grid.appendChild(card);
-      });
+      const grid=document.getElementById('dictionaryGrid'); grid.innerHTML='';
+      filteredWords().forEach(w=>{const card=document.createElement('div');card.className='word-card';card.innerHTML=`<div class="row space-between"><div><div class="word-card-word">${w.word}</div><div class="word-card-phonetic">${w.phonetic||''}</div></div><button class="btn ghost" style="padding:8px 10px;border-radius:12px;">🔊</button></div><div class="word-card-meaning">${w.meaning}</div>`;card.querySelector('button').addEventListener('click',()=>speakWord(w.word));grid.appendChild(card)});
     }
 
     function renderMistakes(){
-      const grid=document.getElementById('mistakesGrid');
-      grid.innerHTML='';
-
-      if(!state.mistakeWords.length){
-        const div=document.createElement('div');
-        div.className='section-note';
-        div.textContent='暂时还没有错题。';
-        grid.appendChild(div);
-        return;
-      }
-
-      state.mistakeWords.forEach(word=>{
-        const item=state.words.find(w=>w.word===word);
-        if(!item)return;
-
-        const card=document.createElement('div');
-        card.className='word-card';
-        card.innerHTML=`
-          <div class="row space-between">
-            <div>
-              <div class="word-card-word">${item.word}</div>
-              <div class="word-card-phonetic">${item.phonetic||''}</div>
-            </div>
-            <button class="btn ghost" style="padding:8px 10px;border-radius:12px;">🔊</button>
-          </div>
-          <div class="word-card-meaning">${item.meaning}</div>
-        `;
-        card.querySelector('button').addEventListener('click',()=>speakWord(item.word));
-        grid.appendChild(card);
-      });
+      const grid=document.getElementById('mistakesGrid'); grid.innerHTML='';
+      if(!state.mistakeWords.length){const div=document.createElement('div');div.className='section-note';div.textContent='暂时还没有错题。';grid.appendChild(div);return}
+      state.mistakeWords.forEach(word=>{const item=state.words.find(w=>w.word===word);if(!item)return;const card=document.createElement('div');card.className='word-card';card.innerHTML=`<div class="row space-between"><div><div class="word-card-word">${item.word}</div><div class="word-card-phonetic">${item.phonetic||''}</div></div><button class="btn ghost" style="padding:8px 10px;border-radius:12px;">🔊</button></div><div class="word-card-meaning">${item.meaning}</div>`;card.querySelector('button').addEventListener('click',()=>speakWord(item.word));grid.appendChild(card)});
     }
 
     function renderQuiz(){
       const current=getQuizCurrent();
-      document.getElementById('quizCounter').textContent=current?`${state.quiz.index+1} / ${state.quiz.deck.length}`:'0 / 0';
-      document.getElementById('quizWord').textContent=current?.word||'—';
-      document.getElementById('quizScore').textContent=state.quiz.score;
-
+      const counterEl=document.getElementById('quizCounter');
+      const wordEl=document.getElementById('quizWord');
+      const scoreEl=document.getElementById('quizScore');
       const box=document.getElementById('quizOptions');
+
+      if(!counterEl || !wordEl || !scoreEl || !box) return;
+
+      counterEl.textContent=current?`${state.quiz.index+1} / ${state.quiz.deck.length}`:'0 / 0';
+      wordEl.textContent=current?.word||'—';
+      scoreEl.textContent=state.quiz.score;
       box.innerHTML='';
 
       if(!current){
-        box.innerHTML=`<div class="section-note">本轮完成，得分 ${state.quiz.score}</div>`;
+        box.innerHTML=`<div class="section-note">本轮完成，最终得分 ${state.quiz.score} / 8。点击“重新开始本轮”再来一次。</div>`;
         return;
       }
 
-      getQuizOptions().forEach(opt=>{
+      const options=getQuizOptions();
+      options.forEach(opt=>{
         const btn=document.createElement('button');
         btn.className='btn ghost';
         btn.style.textAlign='left';
         btn.style.minHeight='62px';
         btn.textContent=opt.meaning;
-        btn.addEventListener('click',()=>answerQuiz(opt));
+        btn.addEventListener('click',()=>answerQuiz(opt, btn));
         box.appendChild(btn);
       });
     }
 
     function renderStats(){
-      document.getElementById('statsKnown').textContent=state.knownWords.length;
-      document.getElementById('statsMistakes').textContent=state.mistakeWords.length;
-      document.getElementById('statsStreak').textContent=state.stats.studyDays.length;
-
+      const knownEl=document.getElementById('statsKnown');
+      const mistakesEl=document.getElementById('statsMistakes');
+      const streakEl=document.getElementById('statsStreak');
       const list=document.getElementById('statsList');
+      if(!knownEl || !mistakesEl || !streakEl || !list) return;
+
+      knownEl.textContent=state.knownWords.length;
+      mistakesEl.textContent=state.mistakeWords.length;
+      streakEl.textContent=state.stats.studyDays.length;
       list.innerHTML='';
+
+      if(!state.words.length){
+        list.innerHTML='<div class="section-note">当前没有词库数据。</div>';
+        return;
+      }
 
       state.words.forEach(w=>{
         const row=document.createElement('div');
         row.className='section-note';
         const p=state.progressMap[w.word];
-        const mastered=state.knownWords.includes(w.word)?'已会':'';
-        row.innerHTML=`<div class="row space-between"><strong>${w.word} ${mastered?'<span class="pill">已会</span>':''}</strong><span>${p?`下次复习：${p.nextReview}`:'新词'}</span></div>`;
+        const mastered=state.knownWords.includes(w.word)?'<span class="pill">已会</span>':'';
+        const nextText=p?`下次复习：${p.nextReview}`:'新词';
+        row.innerHTML=`<div class="row space-between"><strong>${w.word} ${mastered}</strong><span>${nextText}</span></div><div style="margin-top:8px;color:#64748b;">${w.meaning}</div>`;
         list.appendChild(row);
       });
     }
 
-    function renderAll(){
-      renderHeader();
-      renderFlash();
-      renderDictionary();
-      renderMistakes();
-      renderQuiz();
-      renderStats();
-    }
+    function renderAll(){renderHeader();renderFlash();renderDictionary();renderMistakes();renderQuiz();renderStats()}
 
-    function nextCard(){
-      state.showMeaning=false;
-      if(!state.deck.length){
-        renderFlash();
-        return;
-      }
-      state.index=(state.index+1)%state.deck.length;
-      document.getElementById('dictationInput').value='';
-      document.getElementById('dictationResult').textContent='输入后点击“检查”。';
-      renderFlash();
-    }
+    function nextCard(){state.showMeaning=false;state.index=(state.index+1)%state.deck.length;document.getElementById('dictationInput').value='';document.getElementById('dictationResult').textContent='输入后点击“检查”。';renderFlash()}
 
-    function markKnown(){
-      const current=currentWord();
-      if(!current)return;
+    function markKnown(){const current=currentWord();if(!current)return;registerStudyDay();if(!state.knownWords.includes(current.word))state.knownWords.push(current.word);const currentStep=state.progressMap[current.word]?.step||0;const nextStepIndex=Math.min(currentStep,REVIEW_STEPS.length-1);state.progressMap[current.word]={step:currentStep+1,nextReview:formatDate(addDays(new Date(),REVIEW_STEPS[nextStepIndex]))};persist();renderHeader();renderStats();nextCard()}
 
-      registerStudyDay();
+    function checkDictation(){const current=currentWord();if(!current)return;registerStudyDay();const input=document.getElementById('dictationInput').value;const result=document.getElementById('dictationResult');const ok=normalizeText(input)===normalizeText(current.word);if(ok){result.textContent='✅ 拼写正确'}else{result.textContent=`❌ 正确答案：${current.word}`;if(!state.mistakeWords.includes(current.word))state.mistakeWords.push(current.word);persist();renderMistakes();renderStats()}}
 
-      if(!state.knownWords.includes(current.word)){
-        state.knownWords.push(current.word);
-      }
-
-      const currentStep=state.progressMap[current.word]?.step||0;
-      const nextStepIndex=Math.min(currentStep,REVIEW_STEPS.length-1);
-
-      state.progressMap[current.word]={
-        step:currentStep+1,
-        nextReview:formatDate(addDays(new Date(),REVIEW_STEPS[nextStepIndex]))
-      };
-
-      refreshDeck();
-      state.showMeaning=false;
-      persist();
-      renderAll();
-
-      document.getElementById('dictationInput').value='';
-      document.getElementById('dictationResult').textContent='输入后点击“检查”。';
-    }
-
-    function checkDictation(){
-      const current=currentWord();
-      if(!current)return;
-
-      registerStudyDay();
-
-      const input=document.getElementById('dictationInput').value;
-      const result=document.getElementById('dictationResult');
-      const ok=normalizeText(input)===normalizeText(current.word);
-
-      if(ok){
-        result.textContent='✅ 拼写正确';
-      }else{
-        result.textContent=`❌ 正确答案：${current.word}`;
-        if(!state.mistakeWords.includes(current.word)) state.mistakeWords.push(current.word);
-        persist();
-        renderMistakes();
-        renderStats();
-      }
-    }
-
-    function answerQuiz(option){
+    function answerQuiz(option, clickedBtn){
       const current=getQuizCurrent();
       if(!current || state.quiz.locked) return;
 
       state.quiz.locked=true;
       registerStudyDay();
 
+      const buttons=[...document.querySelectorAll('#quizOptions button')];
+      buttons.forEach(btn=>btn.disabled=true);
+
       if(option.word===current.word){
         state.quiz.score+=1;
-      } else if(!state.mistakeWords.includes(current.word)){
-        state.mistakeWords.push(current.word);
+        if(clickedBtn){
+          clickedBtn.style.background='#dcfce7';
+          clickedBtn.style.borderColor='#86efac';
+        }
+      }else{
+        if(!state.mistakeWords.includes(current.word)) state.mistakeWords.push(current.word);
+        if(clickedBtn){
+          clickedBtn.style.background='#fee2e2';
+          clickedBtn.style.borderColor='#fca5a5';
+        }
+        const correctBtn=buttons.find(btn=>btn.textContent===current.meaning);
+        if(correctBtn){
+          correctBtn.style.background='#dcfce7';
+          correctBtn.style.borderColor='#86efac';
+        }
       }
 
       persist();
       renderMistakes();
       renderStats();
+      document.getElementById('quizScore').textContent=state.quiz.score;
 
       setTimeout(()=>{
         state.quiz.index+=1;
@@ -509,147 +381,7 @@
           state.quiz.deck=[];
         }
         renderQuiz();
-      },500);
-    }
-
-    function importWordsFromText(text){
-      const parsed=text
-        .split(/\r?\n/)
-        .map(line=>line.trim())
-        .filter(Boolean)
-        .map(line=>{
-          const parts=line.split(/\t|,/).map(p=>p.trim());
-          return {
-            word:parts[0]||'',
-            meaning:parts[1]||'',
-            phonetic:parts[2]||''
-          };
-        })
-        .filter(w=>w.word&&w.meaning);
-
-      if(!parsed.length)return;
-
-      state.words=parsed;
-      state.progressMap={};
-      state.knownWords=[];
-      state.mistakeWords=[];
-      state.showMeaning=false;
-
-      refreshDeck();
-      buildQuiz();
-      persist();
-      renderAll();
-
-      document.getElementById('dictationInput').value='';
-      document.getElementById('dictationResult').textContent='输入后点击“检查”。';
-
-      alert(`已成功导入 ${parsed.length} 个单词。`);
-    }
-
-    function resetAllData(){
-      localStorage.removeItem(STORAGE_KEYS.words);
-      localStorage.removeItem(STORAGE_KEYS.progress);
-      localStorage.removeItem(STORAGE_KEYS.known);
-      localStorage.removeItem(STORAGE_KEYS.mistakes);
-      localStorage.removeItem(STORAGE_KEYS.settings);
-      localStorage.removeItem(STORAGE_KEYS.stats);
-
-      state.words=[...DEFAULT_WORDS];
-      state.progressMap={};
-      state.knownWords=[];
-      state.mistakeWords=[];
-      state.showMeaning=false;
-      state.settings={autoSpeak:false};
-      state.stats={studyDays:[],quizScore:0};
-
-      refreshDeck();
-      buildQuiz();
-      renderAll();
-
-      document.getElementById('dictationInput').value='';
-      document.getElementById('dictationResult').textContent='输入后点击“检查”。';
-    }
-
-    function bindEvents(){
-      document.getElementById('loginBtn').addEventListener('click',()=>{
-        const name=document.getElementById('loginInput').value.trim();
-        if(!name)return;
-        localStorage.setItem(STORAGE_KEYS.user,name);
-        state.user=name;
-        document.getElementById('loginView').classList.add('hidden');
-        document.getElementById('appView').classList.remove('hidden');
-        renderAll();
-      });
-
-      document.querySelectorAll('.tab').forEach(tab=>{
-        tab.addEventListener('click',()=>{
-          document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-          document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-          tab.classList.add('active');
-          document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
-        });
-      });
-
-      document.getElementById('toggleMeaningBtn').addEventListener('click',()=>{
-        state.showMeaning=!state.showMeaning;
-        renderFlash();
-      });
-
-      document.getElementById('knowBtn').addEventListener('click',markKnown);
-      document.getElementById('nextFlashBtn').addEventListener('click',nextCard);
-
-      document.getElementById('shuffleBtn').addEventListener('click',()=>{
-        refreshDeck();
-        state.showMeaning=false;
-        renderFlash();
-      });
-
-      document.getElementById('speakFlashBtn').addEventListener('click',()=>{
-        const current=currentWord();
-        if(current) speakWord(current.word);
-      });
-
-      document.getElementById('autoSpeakBtn').addEventListener('click',()=>{
-        state.settings.autoSpeak=!state.settings.autoSpeak;
-        persist();
-        renderFlash();
-      });
-
-      document.getElementById('dictationCheckBtn').addEventListener('click',checkDictation);
-      document.getElementById('nextDictationBtn').addEventListener('click',nextCard);
-
-      document.getElementById('dictationSpeakBtn').addEventListener('click',()=>{
-        const current=currentWord();
-        if(current) speakWord(current.word);
-      });
-
-      document.getElementById('searchInput').addEventListener('input',e=>{
-        state.query=e.target.value;
-        renderDictionary();
-      });
-
-      document.getElementById('restartQuizBtn').addEventListener('click',()=>{
-        buildQuiz();
-        renderQuiz();
-      });
-
-      document.getElementById('uploadBtn').addEventListener('click',()=>{
-        document.getElementById('fileInput').click();
-      });
-
-      document.getElementById('fileInput').addEventListener('change',e=>{
-        const file=e.target.files[0];
-        if(!file)return;
-        const reader=new FileReader();
-        reader.onload=event=>importWordsFromText(String(event.target.result||''));
-        reader.readAsText(file,'utf-8');
-      });
-
-      document.getElementById('importTextBtn').addEventListener('click',()=>{
-        importWordsFromText(document.getElementById('pasteWords').value);
-      });
-
-      document.getElementById('resetBtn').addEventListener('click',resetAllData);
+      },700);
     }
 
     function init(){
@@ -660,19 +392,11 @@
       state.mistakeWords=loadJson(STORAGE_KEYS.mistakes,[]);
       state.settings=loadJson(STORAGE_KEYS.settings,{autoSpeak:false});
       state.stats=loadJson(STORAGE_KEYS.stats,{studyDays:[],quizScore:0});
-
-      refreshDeck();
+      state.deck=shuffle(state.words);
       buildQuiz();
       bindEvents();
-
-      if(state.user){
-        document.getElementById('appView').classList.remove('hidden');
-        renderAll();
-      } else {
-        document.getElementById('loginView').classList.remove('hidden');
-      }
+      if(state.user){document.getElementById('appView').classList.remove('hidden'); renderAll()} else {document.getElementById('loginView').classList.remove('hidden')}
     }
-
     init();
   </script>
 </body>
